@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话助手 - 多MCP版</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 220px);
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        .user-message {
+            background-color: #f7f7f8;
+        }
+        .assistant-message {
+            background-color: white;
+        }
+        .message-content {
+            white-space: pre-wrap;
+        }
+        .typing-indicator {
+            display: inline-block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #666;
+            margin: 0 2px;
+            animation: typing 1s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .mcp-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .mcp-online {
+            background-color: #10B981;
+        }
+        .mcp-offline {
+            background-color: #EF4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto px-4 py-6 max-w-4xl">
+        <h1 class="text-3xl font-bold mb-4 text-center">AI 对话助手 - 多MCP版</h1>
+
+        <!-- MCP状态面板 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="text-xl font-semibold mb-2">MCP服务器状态</h2>
+            <div class="grid grid-cols-3 gap-4" id="mcp-status-panel">
+                <div class="flex items-center">
+                    <span class="mcp-status mcp-offline" id="status-playwright"></span>
+                    <span>Playwright</span>
+                    <button class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" onclick="toggleMcpServer('playwright')">启动</button>
+                </div>
+                <div class="flex items-center">
+                    <span class="mcp-status mcp-offline" id="status-desktop-commander"></span>
+                    <span>Desktop Commander</span>
+                    <button class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" onclick="toggleMcpServer('desktop-commander')">启动</button>
+                </div>
+                <div class="flex items-center">
+                    <span class="mcp-status mcp-offline" id="status-server-sequential-thinking"></span>
+                    <span>Sequential Thinking</span>
+                    <button class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" onclick="toggleMcpServer('server-sequential-thinking')">启动</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md">
+            <!-- 聊天记录区域 -->
+            <div id="chat-container" class="chat-container p-4 border-b">
+                <div class="assistant-message p-4 rounded-lg mb-4">
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white mr-3">AI</div>
+                        <div class="message-content">
+                            你好！我是你的AI助手，有什么我可以帮你的吗？我可以使用多种MCP能力来为你提供服务。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="p-4">
+                <div class="flex items-start">
+                    <div class="flex-grow">
+                        <textarea id="user-input" rows="3" class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="输入您的问题..."></textarea>
+                        <div class="flex justify-between items-center mt-2">
+                            <div class="text-xs text-gray-500 flex items-center">
+                                <label class="inline-flex items-center mr-4">
+                                    <span class="mr-2">MCP服务:</span>
+                                    <select id="mcp-select" class="text-sm border rounded p-1">
+                                        <option value="">不使用MCP</option>
+                                        <option value="playwright">Playwright (Web自动化)</option>
+                                        <option value="desktop-commander">Desktop Commander (桌面控制)</option>
+                                        <option value="server-sequential-thinking">Sequential Thinking (思维链)</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div>
+                                <select id="model-select" class="text-sm border rounded p-1">
+                                    <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
+                                    <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
+                                    <option value="anthropic/claude-3-sonnet">Claude 3 Sonnet</option>
+                                    <option value="google/gemini-pro">Gemini Pro</option>
+                                </select>
+                                <button id="send-button" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded">发送</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP调试面板 (可折叠) -->
+        <div class="mt-4 bg-white rounded-lg shadow-md p-4">
+            <div class="flex justify-between items-center cursor-pointer" onclick="toggleDebugPanel()">
+                <h3 class="text-lg font-semibold">MCP调试信息</h3>
+                <span id="debug-toggle">▼</span>
+            </div>
+            <div id="debug-panel" class="mt-2 hidden">
+                <pre id="mcp-debug-output" class="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-64"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatContainer = document.getElementById('chat-container');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+            const modelSelect = document.getElementById('model-select');
+            const mcpSelect = document.getElementById('mcp-select');
+            const mcpDebugOutput = document.getElementById('mcp-debug-output');
+
+            let messageHistory = [
+                {role: "assistant", content: "你好！我是你的AI助手，有什么我可以帮你的吗？我可以使用多种MCP能力来为你提供服务。"}
+            ];
+
+            // 轮询获取MCP服务器状态
+            function updateMcpStatus() {
+                fetch('/api/mcp-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        for (const [server, status] of Object.entries(data)) {
+                            const statusElement = document.getElementById(`status-${server}`);
+                            const buttonElement = statusElement.nextElementSibling.nextElementSibling;
+
+                            if (status) {
+                                statusElement.classList.remove('mcp-offline');
+                                statusElement.classList.add('mcp-online');
+                                buttonElement.textContent = '停止';
+                                buttonElement.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                                buttonElement.classList.add('bg-red-500', 'hover:bg-red-600');
+                            } else {
+                                statusElement.classList.remove('mcp-online');
+                                statusElement.classList.add('mcp-offline');
+                                buttonElement.textContent = '启动';
+                                buttonElement.classList.remove('bg-red-500', 'hover:bg-red-600');
+                                buttonElement.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                            }
+                        }
+                    })
+                    .catch(error => console.error('获取MCP状态失败:', error));
+            }
+
+            // 初始获取状态并定时更新
+            updateMcpStatus();
+            setInterval(updateMcpStatus, 5000);
+
+            // 切换MCP服务器
+            window.toggleMcpServer = function(serverName) {
+                const statusElement = document.getElementById(`status-${serverName}`);
+                const isOnline = statusElement.classList.contains('mcp-online');
+
+                const endpoint = isOnline ? `/api/stop-mcp/${serverName}` : `/api/start-mcp/${serverName}`;
+
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);
+                    updateMcpStatus();
+                })
+                .catch(error => console.error('MCP操作失败:', error));
+            };
+
+            // 切换调试面板
+            window.toggleDebugPanel = function() {
+                const debugPanel = document.getElementById('debug-panel');
+                const debugToggle = document.getElementById('debug-toggle');
+
+                if (debugPanel.classList.contains('hidden')) {
+                    debugPanel.classList.remove('hidden');
+                    debugToggle.textContent = '▲';
+                } else {
+                    debugPanel.classList.add('hidden');
+                    debugToggle.textContent = '▼';
+                }
+            };
+
+            // 添加消息到聊天界面
+            function addMessageToChat(role, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = role === 'user' ? 'user-message p-4 rounded-lg mb-4' : 'assistant-message p-4 rounded-lg mb-4';
+
+                const avatarLetter = role === 'user' ? '你' : 'AI';
+                const avatarColor = role === 'user' ? 'bg-blue-500' : 'bg-green-500';
+
+                messageDiv.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 ${avatarColor} rounded-full flex items-center justify-center text-white mr-3">${avatarLetter}</div>
+                        <div class="message-content">${content}</div>
+                    </div>
+                `;
+
+                chatContainer.appendChild(messageDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            // 显示加载指示器
+            function showLoadingIndicator() {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.id = 'loading-indicator';
+                loadingDiv.className = 'assistant-message p-4 rounded-lg mb-4';
+
+                loadingDiv.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white mr-3">AI</div>
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                `;
+
+                chatContainer.appendChild(loadingDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            // 移除加载指示器
+            function removeLoadingIndicator() {
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+            }
+
+            // 发送消息
+            async function sendMessage() {
+                const message = userInput.value.trim();
+                if (!message) return;
+
+                // 清空输入框
+                userInput.value = '';
+
+                // 添加用户消息到界面
+                addMessageToChat('user', message);
+
+                // 添加到历史
+                messageHistory.push({role: "user", content: message});
+
+                // 显示加载指示器
+                showLoadingIndicator();
+
+                try {
+                    // 发送请求到后端
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            messages: messageHistory,
+                            model: modelSelect.value,
+                            selected_mcp: mcpSelect.value
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    // 移除加载指示器
+                    removeLoadingIndicator();
+
+                    if (data.error) {
+                        addMessageToChat('assistant', `发生错误: ${data.error}`);
+                    } else {
+                        // 添加回复到界面
+                        addMessageToChat('assistant', data.reply);
+
+                        // 添加到历史
+                        messageHistory.push({role: "assistant", content: data.reply});
+
+                        // 如果有MCP数据，显示在调试面板
+                        if (data.mcp_data) {
+                            mcpDebugOutput.textContent = JSON.stringify(data.mcp_data, null, 2);
+                            // 自动显示调试面板
+                            document.getElementById('debug-panel').classList.remove('hidden');
+                            document.getElementById('debug-toggle').textContent = '▲';
+                        }
+                    }
+                } catch (error) {
+                    removeLoadingIndicator();
+                    addMessageToChat('assistant', `请求失败: ${error.message}`);
+                }
+            }
+
+            // 事件监听
+            sendButton.addEventListener('click', sendMessage);
+
+            userInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
